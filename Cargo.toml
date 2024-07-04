@@ -1,0 +1,31 @@
+[package]
+name = "doc-embedder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = [
+    "env-filter",
+    "fmt",
+    "std",
+    "json",
+] }
+candle = { version = "0.5.1", package = "candle-core" }
+candle-transformers = "0.5.1"
+candle-nn = "0.5.1"
+anyhow = "1.0.86"
+clap = { version = "4.5.7", features = [
+    "derive",
+] }
+tokenizers = "0.19.1"
+hf-hub = "0.3.2"
+serde_json = "1.0.118"
+rayon = "1.10.0"
+tokio = { version = "1.38.0", features = [
+    "full",
+] }
+# num_cpus = "1.16.0"
+lancedb = "0.6.0"
+arrow-array = "51.0.0"
+arrow-schema = "51.0.0"
