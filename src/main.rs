@@ -1,6 +1,5 @@
 pub mod models;
 pub mod storage;
-use candle_nn::embedding;
 use clap::Parser;
 use models::bert::BertModelWrapper;
 use rayon::prelude::*;
@@ -41,20 +40,25 @@ async fn main() -> anyhow::Result<()> {
 
     // list the files in the directory to be embedded
     let files_dir = fs::read_dir(cli_args.input_directory)?;
-    files_dir
+
+    let file_list = files_dir
         .into_iter()
         .map(|file| file.unwrap().path().to_str().unwrap().to_string())
-        .collect::<Vec<String>>()
-        .into_par_iter()
-        .for_each(|filename| {
-            if let Err(e) = process_text_file(sender.clone(), filename.as_str()) {
-                warn!("Error processing file: {}: Error:{}", filename, e)
-            }
-        });
+        .collect::<Vec<String>>();
+    file_list.par_iter().for_each(|filename| {
+        if let Err(e) = process_text_file(sender.clone(), filename.as_str()) {
+            warn!("Error processing file: {}: Error:{}", filename, e)
+        }
+    });
 
     drop(sender); // this will close the channel
+    info!("All files processed, waiting for write task to finish");
     db_writer_task.await?; // wait for the db writer task to finish before exiting
-    info!("Total time taken: {:?}", ts_mark.elapsed());
+    info!(
+        "{} files indexed in: {:?}",
+        file_list.len(),
+        ts_mark.elapsed()
+    );
     Ok(())
 }
 

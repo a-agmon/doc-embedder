@@ -25,7 +25,6 @@ rayon = "1.10.0"
 tokio = { version = "1.38.0", features = [
     "full",
 ] }
-# num_cpus = "1.16.0"
 lancedb = "0.6.0"
 arrow-array = "51.0.0"
 arrow-schema = "51.0.0"

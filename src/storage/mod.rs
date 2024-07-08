@@ -5,18 +5,13 @@ use arrow_array::{
     types::Float32Type, FixedSizeListArray, RecordBatch, RecordBatchIterator, StringArray,
 };
 use arrow_schema::ArrowError;
-//use arrow_schema::{Schema, Field, Fields, DataType };
 use lancedb::{
-    arrow::{
-        arrow_schema::{DataType, Field, Schema},
-        IntoArrow,
-    },
-    Connection, Table,
+    arrow::arrow_schema::{DataType, Field, Schema},
+    Table,
 };
 use tracing::warn;
 
 pub struct VecDB {
-    connection: Connection,
     default_table: Table,
 }
 
@@ -38,7 +33,6 @@ impl VecDB {
         }
         let table = connection.open_table(default_table).execute().await?;
         Ok(Self {
-            connection,
             default_table: table,
         })
     }
