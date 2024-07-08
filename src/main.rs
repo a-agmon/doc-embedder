@@ -23,10 +23,6 @@ struct EmbeddingEntry {
     embedding: Vec<f32>,
 }
 
-// constants for the model id and default revision
-const EMB_MODEL_ID: &str = "sentence-transformers/all-MiniLM-L6-v2";
-const EMB_MODEL_REV: &str = "refs/pr/21";
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracing();
@@ -63,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn process_text_file(sender: Sender<EmbeddingEntry>, filename: &str) -> anyhow::Result<()> {
-    let bert_model = models::bert::get_model_reference(EMB_MODEL_ID, EMB_MODEL_REV)?;
+    let bert_model = models::bert::get_model_reference()?;
     info!("reading file: {}", filename);
     let text_chunks = read_file_in_chunks(filename, 256)?;
     let text_chunks: Vec<&str> = text_chunks.iter().map(AsRef::as_ref).collect();

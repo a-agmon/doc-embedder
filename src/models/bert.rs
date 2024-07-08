@@ -7,6 +7,27 @@ use hf_hub::{api::sync::Api, Repo, RepoType};
 use tokenizers::Tokenizer;
 use tracing::{debug, info};
 
+// constants for the model id and default revision
+const EMB_MODEL_ID: &str = "sentence-transformers/all-MiniLM-L6-v2";
+const EMB_MODEL_REV: &str = "refs/pr/21";
+
+thread_local! {
+    static BERT_MODEL: Rc<BertModelWrapper> =   {
+        info!("Loading a model on thread: {:?}", std::thread::current().id());
+        let model = BertModelWrapper::new(candle::Device::Cpu, EMB_MODEL_ID, EMB_MODEL_REV);
+        match model {
+            Ok(model) => Rc::new(model),
+            Err(e) => {
+                panic!("Failed to load the model: {}", e);
+            }
+        }
+    }
+}
+
+pub fn get_model_reference() -> anyhow::Result<Rc<BertModelWrapper>> {
+    BERT_MODEL.with(|model| Ok(model.clone()))
+}
+
 pub struct BertModelWrapper {
     model: BertModel,
     tokenizer: Tokenizer,
@@ -124,37 +145,6 @@ impl BertModelWrapper {
     }
 }
 
-thread_local! {
-    static BERT_MODEL: RefCell<Option<Rc<BertModelWrapper>>> =  RefCell::new(None);
-}
-
-pub fn get_model_reference(
-    model_id: &str,
-    default_revision: &str,
-) -> anyhow::Result<Rc<BertModelWrapper>> {
-    let model_loaded = BERT_MODEL.with(|cell| cell.borrow().is_some());
-    if !model_loaded {
-        info!(
-            "Loading the model: {} with revision: {} for thread: {:?}",
-            model_id,
-            default_revision,
-            std::thread::current().id()
-        );
-        let bert_model = BertModelWrapper::new(candle::Device::Cpu, model_id, default_revision)?;
-        BERT_MODEL.with(|cell| {
-            let mut mutable_cell = cell.borrow_mut();
-            *mutable_cell = Some(Rc::new(bert_model));
-        });
-    }
-    BERT_MODEL.with(|cell| {
-        let cell_content = cell.borrow();
-        match cell_content.as_ref() {
-            Some(model) => anyhow::Ok(Rc::clone(model)),
-            None => Err(anyhow::anyhow!("Model not loaded properly")),
-        }
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,9 +181,7 @@ mod tests {
 
     #[test]
     fn test_embed_multiple_sentences() {
-        let model_id = "sentence-transformers/all-MiniLM-L6-v2";
-        let default_revision = "refs/pr/21";
-        let bert_model = get_model_reference(model_id, default_revision).unwrap();
+        let bert_model = get_model_reference().unwrap();
         let sentences_1 = vec![
             "My cat loves to nap in the sunlight",
             "Whiskers is always chasing after the red laser dot",
