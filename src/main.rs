@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     // init the channel that sends data to the thread that writes embedding to the db
     let (sender, reciever) = std::sync::mpsc::channel::<EmbeddingEntry>();
+    // start the task and get a handle to it
     let db_writer_task =
         init_db_writer_task(reciever, cli_args.db_uri.as_str(), "vectors_table_1", 100).await?;
 
@@ -41,13 +42,14 @@ async fn main() -> anyhow::Result<()> {
         .into_iter()
         .map(|file| file.unwrap().path().to_str().unwrap().to_string())
         .collect::<Vec<String>>();
+    // process the files in parallel
     file_list.par_iter().for_each(|filename| {
         if let Err(e) = process_text_file(sender.clone(), filename.as_str()) {
             warn!("Error processing file: {}: Error:{}", filename, e)
         }
     });
 
-    drop(sender); // this will close the channel
+    drop(sender); // this will close the original channel
     info!("All files processed, waiting for write task to finish");
     db_writer_task.await?; // wait for the db writer task to finish before exiting
     info!(
@@ -58,6 +60,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+// process a text file and send the embeddings to the channel
 fn process_text_file(sender: Sender<EmbeddingEntry>, filename: &str) -> anyhow::Result<()> {
     let bert_model = models::bert::get_model_reference()?;
     info!("reading file: {}", filename);
@@ -170,4 +173,47 @@ fn read_file_in_chunks(file_path: &str, chunk_size: usize) -> anyhow::Result<Vec
         sentences.push(text_buffer.clone());
     }
     Ok(sentences)
+}
+
+// test the entire flow with files in embedding_files_test folder end-to-end
+#[cfg(test)]
+mod tests {
+    use arrow_array::StringArray;
+    use super::*;
+    use crate::embed_sentence;
+    #[tokio::test]
+    async fn test_full_flow() {
+        let temp_folder = "temp_test_folder";
+        let temp_table = "temp_test_table";
+        fs::create_dir(temp_folder).unwrap();
+        let (test_sender, test_reciever) = std::sync::mpsc::channel::<EmbeddingEntry>();
+        let db_writer_task = init_db_writer_task(test_reciever, temp_folder, temp_table, 100)
+            .await
+            .unwrap();
+        let files_dir = fs::read_dir("embedding_files_test").unwrap();
+        let file_list = files_dir
+            .into_iter()
+            .map(|file| file.unwrap().path().to_str().unwrap().to_string())
+            .collect::<Vec<String>>();
+        // process the files in parallel
+        file_list.par_iter().for_each(|filename| {
+            if let Err(e) = process_text_file(test_sender.clone(), filename.as_str()) {
+                panic!("Error processing file: {}: Error:{}", filename, e)
+            }
+        });
+        drop(test_sender); // this will close the original channel
+        db_writer_task.await.unwrap();
+        let db = storage::VecDB::connect(temp_folder, temp_table)
+            .await
+            .unwrap();
+        let bert_model = models::bert::get_model_reference().unwrap();
+        let animals_vector =
+            embed_sentence("I like all animals and especially dogs", &bert_model).unwrap();
+        let record_batch = db.find_similar(animals_vector, 1).await.unwrap();
+        let files_array = record_batch.column_by_name("filename").unwrap();
+        let files = files_array.as_any().downcast_ref::<StringArray>().unwrap();
+        let v = files.value(0);
+        assert_eq!(v, "embedding_files_test/embedding_content_99996.txt");
+        fs::remove_dir_all(temp_folder).unwrap();
+    }
 }
