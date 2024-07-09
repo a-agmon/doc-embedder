@@ -1718,6 +1718,7 @@ dependencies = [
  "candle-nn",
  "candle-transformers",
  "clap",
+ "futures",
  "hf-hub",
  "lancedb",
  "rayon",

@@ -2,9 +2,14 @@ use std::sync::Arc;
 
 use anyhow::Ok;
 use arrow_array::{
-    types::Float32Type, FixedSizeListArray, RecordBatch, RecordBatchIterator, StringArray,
+    cast::AsArray, types::Float32Type, FixedSizeListArray, RecordBatch, RecordBatchIterator,
+    StringArray,
 };
 use arrow_schema::ArrowError;
+
+use lancedb::query::{ExecutableQuery, QueryBase};
+
+use futures::TryStreamExt;
 use lancedb::{
     arrow::arrow_schema::{DataType, Field, Schema},
     Table,
@@ -37,6 +42,22 @@ impl VecDB {
         })
     }
 
+    pub async fn find_similar(&self, vector: Vec<f32>, n: usize) -> anyhow::Result<RecordBatch> {
+        let results = self
+            .default_table
+            .query()
+            .nearest_to(vector)?
+            .limit(n)
+            .execute()
+            .await?
+            .try_collect::<Vec<_>>()
+            .await?;
+
+        println!("Got {} batches of results", results.len());
+        let first = results.first().unwrap();
+        Ok(first.clone())
+    }
+
     /// Get the default schema for the VecDB
     pub fn get_default_schema() -> Arc<Schema> {
         Arc::new(Schema::new(vec![
@@ -63,13 +84,11 @@ impl VecDB {
                 .map(|v| Some(v.into_iter().map(|i| Some(i)))),
             vec_dim,
         );
-        let batches = vec![RecordBatch::try_new(
+        let batches = vec![Ok(RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(key_array), Arc::new(vectors_array)],
-        )
-        .unwrap()]
-        .into_iter()
-        .map(|batch| Ok(batch).map_err(|e| ArrowError::from_external_error(e.into())));
+        )?)
+        .map_err(|e| ArrowError::from_external_error(e.into()))];
         let batch_iterator = RecordBatchIterator::new(batches, schema);
         // Create a RecordBatch stream.
         let boxed_batches = Box::new(batch_iterator);
