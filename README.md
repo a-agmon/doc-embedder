@@ -1,6 +1,7 @@
 # RAG Indexing Pipeline in Rust
 
-This repository contains the source code for a high-performance Retrieval-Augmented Generation (RAG) indexing pipeline implemented in Rust. The application demonstrates how to efficiently read, chunk, embed, and store textual documents as vectors using HuggingFace's Candle framework and LanceDB.
+This repository contains the source code for my [post](https://medium.com/towards-data-science/scale-up-your-rag-a-rust-powered-indexing-pipeline-with-lancedb-and-candle-cc681c6162e8): *Scale Up Your RAG: A Rust-Powered Indexing Pipeline with LanceDB and Candle*  that was published in **Towards Data Science**. The post explains how to build a high-performance Retrieval-Augmented Generation (RAG) indexing pipeline implemented in Rust.
+It also demonstrates how to efficiently read, chunk, embed, and store textual documents as vectors using HuggingFace's Candle framework and LanceDB.
 
 ## Features
 
